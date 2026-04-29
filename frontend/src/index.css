@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  background-color: #cac1c152;
+}
+
+/* Remove number input arrows */
+@layer components {
+  .no-spinner {
+    -moz-appearance: textfield; /* Firefox */
+    appearance: textfield; /* Standard */
+  }
+
+  .no-spinner::-webkit-inner-spin-button,
+  .no-spinner::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0; /* Removes extra spacing */
+  }
+}
+
+.fixed.inset-0 {
+  position: fixed;
+  inset: 0;
+  z-index: 1000; /* Ensure it appears above other elements */
+}
+.relative {
+  position: relative;
+  z-index: 10; /* Set a lower z-index to let the popup appear on top */
+}

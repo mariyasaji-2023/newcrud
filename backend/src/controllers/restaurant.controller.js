@@ -661,9 +661,7 @@ export const editDish = async (req, res) => {
     };
 
     // Remove dish from original location
-    originalTarget.dishes = originalTarget.dishes.filter(
-      (dish) => dish._id.toString() !== dishId
-    );
+    originalTarget.dishes.pull(dishId);
 
     // Add dish to new location
     newTarget.dishes.push(updatedDish);

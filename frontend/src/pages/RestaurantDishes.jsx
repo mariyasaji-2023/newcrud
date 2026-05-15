@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import { MdAddCircleOutline, MdClear, MdArrowUpward } from "react-icons/md";
 import { AlertCircle } from 'lucide-react';
@@ -20,6 +20,7 @@ const api = axios.create({
 const apiCache = {
   cache: new Map(),
   CACHE_DURATION: 5 * 60 * 1000, // 5 minutes
+  pendingRefresh: false, // survives component remounts; set after any edit
 
   // Generate consistent cache keys
   getCacheKey(config) {
@@ -128,6 +129,7 @@ export { api, apiCache };
 
 const RestaurantDishes = () => {
   const { restaurantId } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // All state declarations must come before any hooks
   const [dishes, setDishes] = useState([]);
@@ -142,7 +144,7 @@ const RestaurantDishes = () => {
   const [showScrollToTop, setShowScrollToTop] = useState(false);
   const [missingUrlCount, setMissingUrlCount] = useState(0);
   const [fetchTrigger, setFetchTrigger] = useState(0);
-  const [currentPage, setCurrentPage] = useState(1);
+  const currentPage = parseInt(searchParams.get('page')) || 1;
   const [dishesPerPage] = useState(20);
   const [totalPages, setTotalPages] = useState(1);
   const [totalDishes, setTotalDishes] = useState(0);
@@ -156,13 +158,17 @@ const RestaurantDishes = () => {
     setDishes(prev =>
       prev.map(d => d._id === updatedDish._id ? { ...d, ...updatedDish } : d)
     );
+    // Clear in-memory cache and mark that the next real fetch must bypass
+    // the browser HTTP cache (Cache-Control: max-age=120 on the server).
+    // pendingRefresh is module-level so it survives component remounts.
+    apiCache.clearAll();
+    apiCache.pendingRefresh = true;
   }, []);
 
   // Force refresh - bypasses both apiCache AND browser HTTP cache
   const forceRefresh = useCallback(() => {
     apiCache.clearAll();
     shouldBypassCache.current = true;
-    setCurrentPage(1);
     setFetchTrigger(prev => prev + 1);
   }, []);
   
@@ -204,7 +210,10 @@ const RestaurantDishes = () => {
       // Use the regular axios instead of the cached api for force refresh
       const dishesResponse = forceRefresh
         ? await axios.get(`${baseUrl}${endpoint}`, { params: { page, limit: dishesPerPage } })
-        : await api.get(endpoint, { params: { page, limit: dishesPerPage } });
+        : await api.get(endpoint, {
+            params: { page, limit: dishesPerPage },
+            headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
+          });
   
       const responseData = dishesResponse.data;
       
@@ -247,18 +256,15 @@ const RestaurantDishes = () => {
 
   // Handle page change
   const handlePageChange = useCallback((page) => {
-    setCurrentPage(page);
-    fetchRestaurantData(page);
-    // Optionally scroll to top when changing pages
+    setSearchParams({ page });
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }, [fetchRestaurantData]);
+  }, [setSearchParams]);
 
   // Add a function to load more dishes
   const loadMoreDishes = () => {
     if (!loading && hasMore) {
       const nextPage = currentPage + 1;
-      setCurrentPage(nextPage);
-      fetchRestaurantData(nextPage);
+      setSearchParams({ page: nextPage });
     }
   };
   
@@ -327,7 +333,7 @@ const handleAddDish = useCallback(async (newDish) => {
     apiCache.clearAll();
     
     // Reset to first page to see newly added dish
-    setCurrentPage(1);
+    setSearchParams({ page: 1 });
     
     // Immediately update the UI with the new dish if provided
     if (newDish) {
@@ -427,8 +433,9 @@ const handleAddDish = useCallback(async (newDish) => {
   }, [dishes]);
 
   useEffect(() => {
-    const bypass = shouldBypassCache.current;
+    const bypass = shouldBypassCache.current || apiCache.pendingRefresh;
     shouldBypassCache.current = false;
+    apiCache.pendingRefresh = false;
     fetchRestaurantData(currentPage, bypass);
   }, [fetchRestaurantData, fetchTrigger, currentPage]);
 

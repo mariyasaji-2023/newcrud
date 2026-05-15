@@ -641,11 +641,12 @@ export const editDish = async (req, res) => {
       });
     }
 
-    // Create updated dish object
+    // Create updated dish object — preserve createdAt so sort order is stable
     const updatedDish = {
       _id: originalDish._id,
       dishName,
       description,
+      createdAt: originalDish.createdAt,
       servingInfos: servingInfos.map((info) => ({
         servingInfo: {
           size: info.size,
@@ -756,10 +757,9 @@ export const allDishes = async (req, res) => {
       }
     }
 
-    // Sort dishes
+    // Sort by createdAt so editing a dish never changes its page position
     allDishes.sort((a, b) => {
-      // Use timestamp comparison instead of Date objects for better performance
-      return b.updatedAt - a.updatedAt;
+      return b.createdAt - a.createdAt;
     });
 
     // Count total dishes

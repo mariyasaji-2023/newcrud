@@ -6,7 +6,7 @@ import { Flame, ImageOff } from 'lucide-react';
 import AddorEditDishPopup from "./AddorEditDishPopup";
 import DeleteDishPopup from "./DeleteDishPopup";
 import NutritionModal from "./NutritionModal";
-import { api, apiCache } from "../pages/RestaurantDishes"; // Import api and apiCache
+import { api } from "../pages/RestaurantDishes";
 
 const DishCard = ({ dish, categoryName, subCategoryName, restaurantId, onDishUpdate, onDishEdit }) => {
   const [isEditPopupVisible, setIsEditPopupVisible] = useState(false);
@@ -23,32 +23,31 @@ const DishCard = ({ dish, categoryName, subCategoryName, restaurantId, onDishUpd
     setImageError(false); // Reset image error state when dish changes
   }, [dish]);
 
-  const handleDishUpdate = async (updatedDish) => {
+  // Called after a successful edit — optimistic update only, no API re-fetch
+  const handleEditSuccess = (updatedDish) => {
+    if (updatedDish?.servingInfos?.length) {
+      const newServingInfo = updatedDish.servingInfos[0]?.servingInfo;
+      if (newServingInfo) {
+        setSelectedServingInfo(newServingInfo);
+        setImageError(false);
+      }
+    }
+    if (onDishEdit && updatedDish) {
+      onDishEdit(updatedDish);
+    }
+    setIsEditPopupVisible(false);
+  };
+
+  // Called after a successful delete — needs full refresh to remove the dish
+  const handleDeleteSuccess = async () => {
     try {
-      // Immediately reflect the new URL/data without waiting for a re-fetch
-      if (updatedDish?.servingInfos?.length) {
-        const newServingInfo = updatedDish.servingInfos[0]?.servingInfo;
-        if (newServingInfo) {
-          setSelectedServingInfo(newServingInfo);
-          setImageError(false);
-        }
-      }
-
-      // Also update the dish in the parent list so other UI reflects the change
-      if (onDishEdit && updatedDish) {
-        onDishEdit(updatedDish);
-      }
-
-      apiCache.clearAll();
       if (onDishUpdate) {
         await onDishUpdate();
       }
-
-      setIsEditPopupVisible(false);
-      setIsDeletePopupVisible(false);
     } catch (error) {
-      console.error("Error updating dish data:", error);
+      console.error("Error refreshing after delete:", error);
     }
+    setIsDeletePopupVisible(false);
   };
 
   // Helper to check if URL is valid
@@ -209,7 +208,7 @@ const DishCard = ({ dish, categoryName, subCategoryName, restaurantId, onDishUpd
           mode="edit"
           dish={dish}
           closePopup={() => setIsEditPopupVisible(false)}
-          updateDishList={handleDishUpdate}
+          updateDishList={handleEditSuccess}
           restaurantId={restaurantId}
         />
       )}
@@ -219,7 +218,7 @@ const DishCard = ({ dish, categoryName, subCategoryName, restaurantId, onDishUpd
           dish={dish}
           restaurantId={restaurantId}
           closePopup={() => setIsDeletePopupVisible(false)}
-          onDeleteSuccess={handleDishUpdate}
+          onDeleteSuccess={handleDeleteSuccess}
         />
       )}
 

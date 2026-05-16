@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { CiEdit } from "react-icons/ci";
 import { MdOutlineAddBusiness, MdDelete } from "react-icons/md";
 import axios from "axios";
@@ -85,7 +85,15 @@ const Restaurants = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
 
-  const [currentPage, setCurrentPage] = useState(1);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const currentPage = parseInt(searchParams.get("page") || "1", 10);
+  const setCurrentPage = useCallback((page) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("page", page.toString());
+      return next;
+    });
+  }, [setSearchParams]);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRestaurants, setTotalRestaurants] = useState(0);
 
@@ -139,7 +147,7 @@ const Restaurants = () => {
   // Reset to page 1 when search query changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedQuery]);
+  }, [debouncedQuery, setCurrentPage]);
 
   // Fetch restaurants when page or debounced query changes
   useEffect(() => {
